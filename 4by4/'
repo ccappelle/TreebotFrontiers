@@ -1,0 +1,119 @@
+#ifndef _NODE_CPP
+#define _NODE_CPP
+
+#include "stdio.h"
+#include "string.h"
+
+#include "node.h"
+
+#ifdef dDOUBLE
+#define dsDrawBox dsDrawBoxD
+#define dsDrawSphere dsDrawSphereD
+#define dsDrawCylinder dsDrawCylinderD
+#define dsDrawCapsule dsDrawCapsuleD
+#endif
+
+NODE::NODE(char *tokens) {
+
+	sscanf(tokens,"%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf",&numChildren,&basePosition[0],&basePosition[1],&basePosition[2],&tipPosition[0],&tipPosition[1],&tipPosition[2],&radius);
+
+	centerPosition[0] = ( basePosition[0] + tipPosition[0] ) / 2.0;
+        centerPosition[1] = ( basePosition[1] + tipPosition[1] ) / 2.0;
+        centerPosition[2] = ( basePosition[2] + tipPosition[2] ) / 2.0;
+
+	length = sqrt(	pow(tipPosition[0]-basePosition[0],2.0) +
+			pow(tipPosition[1]-basePosition[1],2.0) +
+			pow(tipPosition[2]-basePosition[2],2.0) );
+
+        tokens = strtok(NULL,"(");
+
+	children = new (NODE*)[numChildren];
+
+	for (int c=0;c<numChildren;c++) {
+
+		children[c] = new NODE(tokens);
+
+		if ( c<(numChildren-1) )
+
+			tokens = strtok(NULL,"(");
+ 
+	}
+
+	/*	
+	tokens = strtok(NULL,"(");
+
+	if ( tokens != NULL )
+
+		left = new NODE(tokens);
+
+	tokens = strtok(NULL,"(");
+
+	if ( tokens != NULL )
+
+		right = new NODE(tokens);
+	*/
+}
+
+NODE::~NODE(void) {
+
+	for (int c=0;c<numChildren;c++) {
+
+		delete children[c];
+		children[c] = NULL;
+	}
+
+	delete[] children;
+	children = NULL;
+
+}
+
+void NODE::Create_In_Simulation(dWorldID world, dSpaceID space) {
+
+	Create_Cylinder(world,space);
+
+	for (int c=0;c<numChildren;c++)
+
+		children[c]->Create_In_Simulation(world,space);
+}
+
+void NODE::Draw(void) {
+
+	dsSetColor (1,1,1);
+	dsSetTexture (DS_WOOD);
+	dsDrawCylinder(dBodyGetPosition(body),dBodyGetRotation(body),length,radius);
+
+	if ( left )
+
+		left->Draw();
+
+	if ( right )
+
+		right->Draw();
+}
+
+// ------------------------ Private methods -----------------------
+
+void NODE::Create_Cylinder(dWorldID world, dSpaceID space) {
+
+        dMass m;
+
+        body = dBodyCreate (world);
+
+        dBodySetPosition(body,centerPosition[0],centerPosition[1],centerPosition[2]);
+
+        dMatrix3 R;
+
+        dRFromZAxis(R, tipPosition[0] - basePosition[0], tipPosition[1] - basePosition[1], tipPosition[2] - basePosition[2]);
+
+	dBodySetRotation(body,R);
+
+        dMassSetSphere (&m,1,radius);
+        dMassAdjust (&m,1);
+        dBodySetMass (body,&m);
+
+        geom = dCreateCylinder(space,radius,length);
+
+        dGeomSetBody(geom,body);
+}
+
+#endif
